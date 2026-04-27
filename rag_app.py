@@ -8,6 +8,7 @@ Pokretanje: streamlit run app.py
 
 import os
 import time
+import base64
 import streamlit as st
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -27,10 +28,49 @@ anthropic_client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 # Parametri
 EMBEDDING_MODEL = "text-embedding-3-small"
 CLAUDE_MODEL = "claude-sonnet-4-20250514"
-TOP_K = 5  # Broj chunkova koji se dohvataju iz Pinecone-a
-CHUNK_SIZE = 500
-CHUNK_OVERLAP = 50
+TOP_K = 1000  # Broj chunkova koji se dohvataju iz Pinecone-a
+CANDIDATE_K = 1500  # Širi skup kandidata iz Pinecone-a
+CHUNK_SIZE = 1200
+CHUNK_OVERLAP = 200
 BATCH_SIZE = 100
+
+
+def kodiraj_naziv_fajla(naziv_fajla: str) -> str:
+    """Kodira naziv fajla za stabilan Pinecone ID prefiks."""
+    return base64.urlsafe_b64encode(naziv_fajla.encode("utf-8")).decode("ascii").rstrip("=")
+
+
+def dokument_prefiks(naziv_fajla: str) -> str:
+    """Vraća zajednički prefiks ID-eva za jedan dokument."""
+    return f"doc::{kodiraj_naziv_fajla(naziv_fajla)}::chunk::"
+
+
+def listaj_ideve_po_prefiksu(prefiks: str) -> list[str]:
+    """Vraća postojeće Pinecone ID-eve za dati prefiks."""
+    ids = []
+    try:
+        for stavka in index.list(prefix=prefiks):
+            if isinstance(stavka, str):
+                ids.append(stavka)
+            elif isinstance(stavka, dict):
+                ids.extend(stavka.get("ids", []))
+            elif hasattr(stavka, "ids"):
+                ids.extend(stavka.ids)
+    except Exception:
+        return []
+    return ids
+
+
+def obrisi_stare_chunkove_dokumenta(naziv_fajla: str):
+    """Briše postojeće chunkove dokumenta prije ponovnog upisa."""
+    # Očisti i legacy vektore koji su možda upisani starim ID formatom.
+    index.delete(filter={"fajl": {"$eq": naziv_fajla}})
+
+    ids = listaj_ideve_po_prefiksu(dokument_prefiks(naziv_fajla))
+    if not ids:
+        return
+    for i in range(0, len(ids), 100):
+        index.delete(ids=ids[i:i + 100])
 
 
 def kreiraj_embedding_upita(upit: str) -> list[float]:
@@ -79,12 +119,13 @@ def ingestuj_uploadane_fajlove(uploadani_fajlovi: list) -> tuple[int, int]:
 
         chunkovi = podijeli_na_chunkove(sadrzaj)
         vektori = []
-        prefiks = str(int(time.time() * 1000))
+        prefiks = dokument_prefiks(fajl.name)
+        obrisi_stare_chunkove_dokumenta(fajl.name)
 
         for i, chunk in enumerate(chunkovi):
             embedding = kreiraj_embedding_teksta(chunk)
             vektori.append({
-                "id": f"upload-{prefiks}-{fajl.name}-chunk-{i}",
+                "id": f"{prefiks}{i}",
                 "values": embedding,
                 "metadata": {
                     "tekst": chunk,
@@ -140,11 +181,44 @@ def pretrazi_pinecone(upit: str) -> list[dict]:
     
     rezultati = index.query(
         vector=embedding,
-        top_k=TOP_K,
+        top_k=max(CANDIDATE_K, TOP_K),
         include_metadata=True
     )
-    
-    return rezultati.matches
+
+    matches = list(rezultati.matches or [])
+    if not matches:
+        return []
+
+    # Diversifikacija po fajlu: uzmi najbolji match po fajlu pa popuni ostatak.
+    najbolji_po_fajlu = {}
+    for m in matches:
+        metadata = getattr(m, "metadata", None) or {}
+        fajl = metadata.get("fajl", "nepoznato")
+        if fajl not in najbolji_po_fajlu or m.score > najbolji_po_fajlu[fajl].score:
+            najbolji_po_fajlu[fajl] = m
+
+    sortirani_po_fajlu = sorted(najbolji_po_fajlu.values(), key=lambda x: x.score, reverse=True)
+    sortirani_svi = sorted(matches, key=lambda x: x.score, reverse=True)
+
+    izabrani = []
+    korisceni = set()
+
+    for m in sortirani_po_fajlu:
+        if len(izabrani) >= TOP_K:
+            break
+        izabrani.append(m)
+        korisceni.add(getattr(m, "id", None))
+
+    for m in sortirani_svi:
+        if len(izabrani) >= TOP_K:
+            break
+        mid = getattr(m, "id", None)
+        if mid in korisceni:
+            continue
+        izabrani.append(m)
+        korisceni.add(mid)
+
+    return izabrani
 
 
 def pripremi_kontekst(matches: list[dict]) -> str:
@@ -163,8 +237,10 @@ def pitaj_claudea(upit: str, kontekst: str) -> str:
     """Šalje upit i kontekst Claudeu i vraća odgovor."""
     
     sistem_prompt = """Ti si koristan asistent koji odgovara ISKLJUČIVO na osnovu dostavljenog konteksta.
-Ako odgovor nije u kontekstu, reci: "Na osnovu dostupnih dokumenata, ne mogu odgovoriti na ovo pitanje."
-Uvijek navedi na koji izvor se pozivas kada daješ odgovor."""
+Ako odgovor nije jasno u kontekstu, reci: "Na osnovu dostupnih dokumenata, ne mogu odgovoriti na ovo pitanje."
+Za brojke, datume i nazive vrati TAČNU vrijednost iz konteksta bez nagađanja.
+Uvijek navedi izvor(e) [Izvor X] na koje se pozivaš.
+Ako postoji više mogućih odgovora, navedi sve relevantne opcije i njihove izvore."""
 
     poruka = f"""Kontekst iz dokumenata:
 {kontekst}
@@ -174,7 +250,7 @@ Pitanje korisnika:
 
     odgovor = anthropic_client.messages.create(
         model=CLAUDE_MODEL,
-        max_tokens=1000,
+        max_tokens=4000,
         system=sistem_prompt,
         messages=[
             {"role": "user", "content": poruka}

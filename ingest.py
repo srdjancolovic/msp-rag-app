@@ -8,6 +8,7 @@ Pokretanje: python ingest.py --file putanja/do/fajla.txt
 import os
 import argparse
 import time
+import base64
 from dotenv import load_dotenv
 from openai import OpenAI
 from pinecone import Pinecone
@@ -22,11 +23,50 @@ pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
 index = pc.Index(os.getenv("PINECONE_INDEX_NAME"))
 
 # Parametri za dijeljenje teksta
-CHUNK_SIZE = 500          # Broj karaktera po chunku
-CHUNK_OVERLAP = 50        # Preklapanje između chunkova
+CHUNK_SIZE = 1200         # Broj karaktera po chunku
+CHUNK_OVERLAP = 200       # Preklapanje između chunkova
 EMBEDDING_MODEL = "text-embedding-3-small"  # OpenAI embedding model
 BATCH_SIZE = 100          # Broj vektora koji se upisuju odjednom
 DEFAULT_FOLDER = "imprimatur/dokumenti"
+
+
+def kodiraj_naziv_fajla(naziv_fajla: str) -> str:
+    """Kodira naziv fajla za stabilan Pinecone ID prefiks."""
+    return base64.urlsafe_b64encode(naziv_fajla.encode("utf-8")).decode("ascii").rstrip("=")
+
+
+def dokument_prefiks(naziv_fajla: str) -> str:
+    """Vraća zajednički prefiks ID-eva za jedan dokument."""
+    return f"doc::{kodiraj_naziv_fajla(naziv_fajla)}::chunk::"
+
+
+def listaj_ideve_po_prefiksu(prefiks: str) -> list[str]:
+    """Vraća postojeće Pinecone ID-eve za dati prefiks."""
+    ids = []
+    try:
+        for stavka in index.list(prefix=prefiks):
+            if isinstance(stavka, str):
+                ids.append(stavka)
+            elif isinstance(stavka, dict):
+                ids.extend(stavka.get("ids", []))
+            elif hasattr(stavka, "ids"):
+                ids.extend(stavka.ids)
+    except Exception:
+        return []
+    return ids
+
+
+def obrisi_stare_chunkove_dokumenta(naziv_fajla: str):
+    """Briše postojeće chunkove dokumenta prije ponovnog upisa."""
+    # Očisti i legacy vektore koji su upisani starim ID formatom.
+    index.delete(filter={"fajl": {"$eq": naziv_fajla}})
+
+    ids = listaj_ideve_po_prefiksu(dokument_prefiks(naziv_fajla))
+    if not ids:
+        return
+    for i in range(0, len(ids), 100):
+        index.delete(ids=ids[i:i + 100])
+    print(f"  Obrisano starih chunkova: {len(ids)}")
 
 
 def ucitaj_tekst(putanja: str) -> str:
@@ -57,8 +97,10 @@ def kreiraj_embedding(tekst: str) -> list[float]:
 def upisi_u_pinecone(chunkovi: list[str], naziv_fajla: str):
     """Kreira embeddings za sve chunkove i upisuje ih u Pinecone."""
     print(f"Ukupno chunkova: {len(chunkovi)}")
+    obrisi_stare_chunkove_dokumenta(naziv_fajla)
     
     vektori = []
+    prefiks = dokument_prefiks(naziv_fajla)
     
     for i, chunk in enumerate(chunkovi):
         print(f"  Procesiranje chunka {i+1}/{len(chunkovi)}...")
@@ -67,7 +109,7 @@ def upisi_u_pinecone(chunkovi: list[str], naziv_fajla: str):
         
         # Svaki vektor ima ID, embedding i metadata
         vektori.append({
-            "id": f"{naziv_fajla}-chunk-{i}",
+            "id": f"{prefiks}{i}",
             "values": embedding,
             "metadata": {
                 "tekst": chunk,
