@@ -292,24 +292,92 @@ html, body, [class*="css"] {
 
 /* ── Chat messages ── */
 [data-testid="stChatMessage"] {
-    background: #111a2b;
-    border: 1px solid #24324a;
-    border-radius: 16px;
-    padding: 0.9rem 1rem;
-    margin-bottom: 0.6rem;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+    background: linear-gradient(180deg, #121c30 0%, #0f182a 100%);
+    border: 1px solid #22324d;
+    border-radius: 18px;
+    padding: 1rem 1.05rem;
+    margin-bottom: 0.7rem;
+    box-shadow: 0 8px 24px rgba(2, 8, 20, 0.28);
+}
+[data-testid="stChatMessage"]:hover {
+    border-color: #31476c;
+    box-shadow: 0 10px 26px rgba(2, 8, 20, 0.34);
 }
 
 /* ── Chat input ── */
 [data-testid="stChatInput"] {
-    border-radius: 14px !important;
-    border: 1.5px solid #e2e8f0 !important;
-    background: #fff !important;
-    box-shadow: 0 2px 12px rgba(0,0,0,0.06) !important;
+    border-radius: 16px !important;
+    border: 1px solid #2f4367 !important;
+    background: linear-gradient(180deg, #0f182a 0%, #0c1424 100%) !important;
+    box-shadow: 0 12px 28px rgba(2, 8, 20, 0.38) !important;
+    padding: 0.2rem !important;
+}
+[data-testid="stChatInput"]:focus-within {
+    outline: none !important;
+    border-color: #2f4367 !important;
+    box-shadow: 0 12px 28px rgba(2, 8, 20, 0.38) !important;
+}
+[data-testid="stChatInput"] [data-baseweb="textarea"],
+[data-testid="stChatInput"] [data-baseweb="base-input"] {
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+}
+[data-testid="stChatInput"] [data-baseweb="textarea"]:focus-within,
+[data-testid="stChatInput"] [data-baseweb="base-input"]:focus-within {
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
 }
 [data-testid="stChatInput"] textarea,
 [data-testid="stChatInput"] input {
-    color: #000000 !important;
+    color: #e5e7eb !important;
+    caret-color: #7c9bff !important;
+    font-size: 0.96rem !important;
+}
+[data-testid="stChatInput"] textarea::placeholder,
+[data-testid="stChatInput"] input::placeholder {
+    color: #90a4c2 !important;
+}
+[data-testid="stChatInput"] textarea:focus,
+[data-testid="stChatInput"] input:focus,
+[data-testid="stChatInput"] textarea:focus-visible,
+[data-testid="stChatInput"] input:focus-visible {
+    outline: none !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+/* ── Search input (same style as chat input) ── */
+[data-testid="stTextInput"] [data-baseweb="input"] {
+    border-radius: 16px !important;
+    border: 1px solid #2f4367 !important;
+    background: linear-gradient(180deg, #0f182a 0%, #0c1424 100%) !important;
+    box-shadow: 0 12px 28px rgba(2, 8, 20, 0.38) !important;
+}
+[data-testid="stTextInput"] [data-baseweb="input"]:focus-within {
+    outline: none !important;
+    border-color: #2f4367 !important;
+    box-shadow: 0 12px 28px rgba(2, 8, 20, 0.38) !important;
+}
+[data-testid="stTextInput"] input {
+    border-radius: 16px !important;
+    border: 1px solid #2f4367 !important;
+    background: linear-gradient(180deg, #0f182a 0%, #0c1424 100%) !important;
+    box-shadow: 0 12px 28px rgba(2, 8, 20, 0.38) !important;
+    color: #e5e7eb !important;
+    caret-color: #7c9bff !important;
+    font-size: 0.96rem !important;
+}
+[data-testid="stTextInput"] input::placeholder {
+    color: #90a4c2 !important;
+}
+[data-testid="stTextInput"] input:focus,
+[data-testid="stTextInput"] input:focus-visible,
+[data-testid="stTextInput"] input:active {
+    outline: none !important;
+    border-color: #2f4367 !important;
+    box-shadow: none !important;
 }
 
 /* ── History panel ── */
