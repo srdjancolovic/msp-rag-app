@@ -129,6 +129,11 @@ def dohvati_preview_fajlova_iz_pinecone(limit: int = 200) -> list[str]:
     return sorted(fajlovi)
 
 
+def obrisi_dokument_iz_pinecone(naziv_fajla: str):
+    """Briše sve vektore dokumenta iz Pinecone po metadata polju `fajl`."""
+    index.delete(filter={"fajl": {"$eq": naziv_fajla}})
+
+
 def pretrazi_pinecone(upit: str) -> list[dict]:
     """Pronalazi najsličnije chunkove u Pinecone-u."""
     embedding = kreiraj_embedding_upita(upit)
@@ -611,3 +616,11 @@ else:
                     """,
                     unsafe_allow_html=True,
                 )
+                if st.button("Obrisi dokument", key=f"obrisi_{idx}_{naziv}", use_container_width=False):
+                    try:
+                        obrisi_dokument_iz_pinecone(naziv)
+                        st.session_state["pinecone_preview_fajlovi"] = dohvati_preview_fajlova_iz_pinecone()
+                        st.success(f"Dokument '{naziv}' je obrisan iz Pinecone-a.")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Brisanje nije uspjelo: {str(e)}")
