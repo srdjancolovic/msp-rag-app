@@ -307,6 +307,10 @@ html, body, [class*="css"] {
     background: #fff !important;
     box-shadow: 0 2px 12px rgba(0,0,0,0.06) !important;
 }
+[data-testid="stChatInput"] textarea,
+[data-testid="stChatInput"] input {
+    color: #000000 !important;
+}
 
 /* ── History panel ── */
 .history-panel {
@@ -557,7 +561,7 @@ else:
         help="Podržani formati: .txt, .md, .csv",
         label_visibility="visible",
     )
-    if st.button("Pokreni ingestion", key="ingest_upload", use_container_width=False):
+    if st.button("Ucitaj dokument u bazu", key="ingest_upload", use_container_width=False):
         if not uploadani_fajlovi:
             st.warning("Odaberi bar jedan fajl.")
         else:
@@ -618,8 +622,10 @@ else:
                 )
                 if st.button("Obrisi dokument", key=f"obrisi_{idx}_{naziv}", use_container_width=False):
                     try:
-                        obrisi_dokument_iz_pinecone(naziv)
-                        st.session_state["pinecone_preview_fajlovi"] = dohvati_preview_fajlova_iz_pinecone()
+                        with st.spinner(f"Brišem dokument '{naziv}'..."):
+                            obrisi_dokument_iz_pinecone(naziv)
+                            st.session_state["pinecone_preview_fajlovi"] = dohvati_preview_fajlova_iz_pinecone()
+                        st.toast(f"Dokument '{naziv}' je obrisan.", icon="✅")
                         st.success(f"Dokument '{naziv}' je obrisan iz Pinecone-a.")
                         st.rerun()
                     except Exception as e:
