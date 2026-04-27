@@ -37,10 +37,24 @@ ANTHROPIC_API_KEY=your_anthropic_api_key_here
 
 ## 4) Ubacivanje dokumenata u Pinecone
 
-Prvo ingestuj tekstualni fajl:
+### Opcija A (preporučeno): ingest svih fajlova iz `imprimatur/dokumenti`
 
 ```bash
-python ingest.py --file imprimatur/dokumenti
+python3 ingest.py
+```
+
+Ova komanda automatski učitava sve fajlove iz foldera `imprimatur/dokumenti`.
+
+### Opcija B: ingest jednog fajla
+
+```bash
+python3 ingest.py --file imprimatur/dokumenti/01_katalog_knjiga.md
+```
+
+### Opcija C: ingest svih fajlova iz custom foldera
+
+```bash
+python3 ingest.py --folder imprimatur/dokumenti
 ```
 
 Skripta:

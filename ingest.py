@@ -26,6 +26,7 @@ CHUNK_SIZE = 500          # Broj karaktera po chunku
 CHUNK_OVERLAP = 50        # Preklapanje između chunkova
 EMBEDDING_MODEL = "text-embedding-3-small"  # OpenAI embedding model
 BATCH_SIZE = 100          # Broj vektora koji se upisuju odjednom
+DEFAULT_FOLDER = "imprimatur/dokumenti"
 
 
 def ucitaj_tekst(putanja: str) -> str:
@@ -90,23 +91,50 @@ def upisi_u_pinecone(chunkovi: list[str], naziv_fajla: str):
     print("Ingestion završen!")
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Upis dokumenta u Pinecone.")
-    parser.add_argument("--file", required=True, help="Putanja do tekstualnog fajla")
-    args = parser.parse_args()
-    
-    putanja = args.file
+def ingestuj_fajl(putanja: str):
+    """Ingestuje jedan fajl u Pinecone."""
     naziv_fajla = os.path.basename(putanja)
-    
-    print(f"Učitavam: {putanja}")
+    print(f"\nUčitavam: {putanja}")
     tekst = ucitaj_tekst(putanja)
     print(f"Dužina teksta: {len(tekst)} karaktera")
-    
+
     print("Dijelim na chunkove...")
     chunkovi = podijeli_na_chunkove(tekst)
-    
+
     print("Kreiram embeddings i upisujem u Pinecone...")
     upisi_u_pinecone(chunkovi, naziv_fajla)
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Upis dokumenta/foldera u Pinecone.")
+    parser.add_argument("--file", help="Putanja do jednog tekstualnog fajla")
+    parser.add_argument(
+        "--folder",
+        default=DEFAULT_FOLDER,
+        help=f"Folder iz kojeg ingestuje sve fajlove (default: {DEFAULT_FOLDER})",
+    )
+    args = parser.parse_args()
+
+    if args.file:
+        ingestuj_fajl(args.file)
+        return
+
+    if not os.path.isdir(args.folder):
+        raise FileNotFoundError(f"Folder ne postoji: {args.folder}")
+
+    fajlovi = [
+        os.path.join(args.folder, ime)
+        for ime in sorted(os.listdir(args.folder))
+        if os.path.isfile(os.path.join(args.folder, ime))
+    ]
+
+    if not fajlovi:
+        print(f"Nema fajlova za ingest u folderu: {args.folder}")
+        return
+
+    print(f"Pronađeno fajlova u folderu '{args.folder}': {len(fajlovi)}")
+    for putanja in fajlovi:
+        ingestuj_fajl(putanja)
 
 
 if __name__ == "__main__":
