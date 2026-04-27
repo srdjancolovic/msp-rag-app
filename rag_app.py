@@ -90,17 +90,116 @@ Pitanje korisnika:
 # ─── Streamlit UI ────────────────────────────────────────────────────────────
 
 st.set_page_config(
-    page_title="RAG Aplikacija",
-    page_icon="🔍",
+    page_title="Imprimatur AI Assistant",
+    page_icon="✨",
     layout="wide"
 )
 
-st.title("🔍 RAG Aplikacija")
-st.caption("Postavljaj pitanja o tvojim dokumentima")
+st.markdown(
+    """
+    <style>
+        .block-container {
+            padding-top: 2.6rem;
+            padding-bottom: 1.2rem;
+            max-width: 980px;
+        }
+        .app-header {
+            background: linear-gradient(130deg, #f7f8ff 0%, #eef4ff 100%);
+            border: 1px solid #e5e7eb;
+            border-radius: 18px;
+            padding: 1.2rem 1.4rem;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.9rem;
+        }
+        .logo-badge {
+            width: 48px;
+            height: 48px;
+            border-radius: 14px;
+            background: linear-gradient(140deg, #6366f1 0%, #22c55e 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.3rem;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+        .app-title {
+            font-size: 1.5rem;
+            font-weight: 650;
+            color: #0f172a;
+            margin: 0;
+        }
+        .app-subtitle {
+            color: #475569;
+            margin-top: 0.2rem;
+            margin-bottom: 0;
+            font-size: 0.95rem;
+        }
+        .chat-hint {
+            border: 1px solid #e2e8f0;
+            border-radius: 14px;
+            padding: 0.8rem 1rem;
+            background: #ffffff;
+            color: #334155;
+            margin-bottom: 0.7rem;
+        }
+        .stChatMessage {
+            border-radius: 14px;
+            border: 1px solid #e2e8f0;
+            background: #ffffff;
+        }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+st.markdown(
+    """
+    <div class="app-header">
+        <div class="logo-badge">I✦</div>
+        <div>
+            <p class="app-title">Imprimatur - AI asistent</p>
+            <p class="app-subtitle">Postavi pitanje i dobij odgovor na osnovu tvojih dokumenata u Pinecone-u.</p>
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
+st.markdown(
+    """
+    <div class="chat-hint">
+        Primjer: <b>"Koja su pravila saradnje sa autorima?"</b> ili <b>"Sažmi FAQ u 5 tačaka."</b>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
 # Inicijalizacija historije poruka u session state
 if "poruke" not in st.session_state:
     st.session_state.poruke = []
+
+with st.sidebar:
+    st.markdown("### Istorija chatova")
+    korisnicka_pitanja = [
+        poruka["sadrzaj"]
+        for poruka in st.session_state.poruke
+        if poruka.get("uloga") == "user"
+    ]
+    if not korisnicka_pitanja:
+        st.caption("Još nema poruka.")
+    else:
+        for i, pitanje in enumerate(reversed(korisnicka_pitanja), 1):
+            st.markdown(f"**{i}.** {pitanje}")
+
+col_left, col_right = st.columns([0.85, 0.15])
+with col_right:
+    if st.button("Obriši chat", use_container_width=True):
+        st.session_state.poruke = []
+        st.rerun()
 
 # Prikaz historije razgovora
 for poruka in st.session_state.poruke:
@@ -130,6 +229,10 @@ if upit:
                 if not matches:
                     odgovor_tekst = "Nisam pronašao relevantne informacije u dokumentima."
                     st.markdown(odgovor_tekst)
+                    st.session_state.poruke.append({
+                        "uloga": "assistant",
+                        "sadrzaj": odgovor_tekst
+                    })
                 else:
                     # 2. Pripremi kontekst
                     kontekst = pripremi_kontekst(matches)
@@ -152,26 +255,7 @@ if upit:
             except Exception as e:
                 greska = f"Greška: {str(e)}"
                 st.error(greska)
-                odgovor_tekst = greska
-
-# Sidebar sa informacijama
-with st.sidebar:
-    st.header("ℹ️ O aplikaciji")
-    st.markdown("""
-    **Stack:**
-    - 🔢 OpenAI Embeddings
-    - 🌲 Pinecone Vector DB
-    - 🤖 Claude (Anthropic)
-    - 🖥️ Streamlit
-    
-    **Kako koristiti:**
-    1. Pokreni `ingest.py` da ubaciš dokumente
-    2. Postavi pitanje u chat
-    3. Aplikacija pronalazi relevantne dijelove
-    4. Claude generiše odgovor
-    """)
-    
-    # Dugme za brisanje historije
-    if st.button("🗑️ Obriši historiju razgovora"):
-        st.session_state.poruke = []
-        st.rerun()
+                st.session_state.poruke.append({
+                    "uloga": "assistant",
+                    "sadrzaj": greska
+                })
