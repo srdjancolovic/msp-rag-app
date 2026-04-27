@@ -19,7 +19,7 @@ Jednostavna RAG aplikacija sa:
 U root folderu projekta pokreni:
 
 ```bash
-python -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 ```
@@ -69,7 +69,7 @@ Skripta:
 Pokreni Streamlit:
 
 ```bash
-streamlit run app.py
+streamlit run rag_app.py
 ```
 
 Nakon pokretanja, otvori URL koji Streamlit prikaže u terminalu (obično `http://localhost:8501`).
